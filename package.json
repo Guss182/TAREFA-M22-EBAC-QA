@@ -1,0 +1,14 @@
+{
+  "name": "cy-pageobjects",
+  "version": "1.0.0",
+  "description": "Exemplo de PageObjects",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx cypress run"
+  },
+  "author": "ernestosbarbosa",
+  "license": "ISC",
+  "dependencies": {
+    "cypress": "^13.6.3"
+  }
+}
