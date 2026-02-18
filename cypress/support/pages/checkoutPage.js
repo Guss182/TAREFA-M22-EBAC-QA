@@ -4,7 +4,7 @@ class CheckoutPage {
     cy.location('pathname', { timeout: 20000 }).should('include', '/checkout');
   }
 
-  fillBilling(billing) {
+  preencherCobrança(billing) {
     cy.get('#billing_first_name', { timeout: 20000 }).clear().type(billing.firstName);
     cy.get('#billing_last_name').clear().type(billing.lastName);
     cy.get('#billing_address_1').clear().type(billing.address1);
@@ -14,7 +14,7 @@ class CheckoutPage {
     cy.get('#billing_email').clear().type(billing.email);
   }
 
-  acceptTermsIfPresent() {
+  aceiteDeTermos() {
     cy.get('body').then(($body) => {
       if ($body.find('#terms').length) {
         cy.get('#terms').then(($t) => {
@@ -31,7 +31,7 @@ class CheckoutPage {
     });
   }
 
-  selectPaymentIfNeeded() {
+  selecionarPagemento() {
     cy.get('body').then(($body) => {
       const $payments = $body.find('input[name="payment_method"]');
       if ($payments.length) {
@@ -43,9 +43,9 @@ class CheckoutPage {
     });
   }
 
-  placeOrder() {
-    this.acceptTermsIfPresent();
-    this.selectPaymentIfNeeded();
+  fazerPedido() {
+    this.aceiteDeTermos();
+    this.selecionarPagemento();
 
     cy.get('#place_order, button[name="woocommerce_checkout_place_order"]', { timeout: 20000 })
       .filter(':visible')

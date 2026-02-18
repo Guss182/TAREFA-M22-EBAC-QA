@@ -1,5 +1,5 @@
 class CartPage {
-  proceedToCheckout() {
+  seguirCheckout() {
     cy.get('a.checkout-button, a[href*="checkout"], a[href*="finalizar"]', { timeout: 20000 })
       .filter(':visible')
       .first()

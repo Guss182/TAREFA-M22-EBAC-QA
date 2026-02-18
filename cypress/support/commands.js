@@ -23,3 +23,6 @@
 //
 // -- This will overwrite an existing command --
 // Cypress.Commands.overwrite('visit', (originalFn, url, options) => { ... })
+/// <reference types="cypress" />
+
+// ALTERAÇÃO: comando para selecionar variações (Size/Color) de forma robusta

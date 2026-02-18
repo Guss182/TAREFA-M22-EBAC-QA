@@ -1,120 +1,107 @@
 class ProductPage {
-  openShop() {
+  abrirEbacShop() {
     cy.visit('/produtos/');
-    cy.get('div.products, ul.products, div.products.products-grid', { timeout: 20000 })
-      .should('be.visible');
+    cy.get('div.products, ul.products, .products', { timeout: 20000 }).should('be.visible');
   }
 
-  openFirstProductFromGrid() {
-    cy.get('a[href*="/product/"]', { timeout: 20000 })
-      .filter(':visible')
-      .first()
-      .click();
-
-    cy.location('pathname', { timeout: 20000 }).should('include', '/product/');
-  }
-
-  selectAnyVariations() {
-    cy.get('body').then(($body) => {
-      const sizeLabel = [...$body.find('td.label')].find((el) =>
-        /size|tamanho/i.test((el.innerText || '').trim())
-      );
-
-      if (sizeLabel) {
-        cy.wrap(sizeLabel)
-          .parents('tr')
-          .first()
-          .within(() => {
-            cy.get('li.variable-item.button-variable-item', { timeout: 15000 })
-              .not('.disabled')
-              .filter(':visible')
-              .first()
-              .click({ force: true });
-          });
-      }
-    });
-
-    cy.get('body').then(($body) => {
-      const colorLabel = [...$body.find('td.label')].find((el) =>
-        /color|cor/i.test((el.innerText || '').trim())
-      );
-
-      if (colorLabel) {
-        cy.wrap(colorLabel)
-          .parents('tr')
-          .first()
-          .within(() => {
-            cy.get('li.variable-item.button-variable-item', { timeout: 15000 })
-              .not('.disabled')
-              .filter(':visible')
-              .first()
-              .click({ force: true });
-          });
-      }
-    });
-
-    cy.get('input.variation_id', { timeout: 20000 })
-      .should('exist')
-      .then(($vid) => {
-        const v = $vid.val();
-        if (v && v !== '0') return;
-
-        cy.log('Fallback: variation_id ainda 0, setando selects escondidos');
-
-        cy.get('body').then(($body) => {
-          const sizeVal = $body
-            .find('td.label')
-            .filter((_, el) => /size|tamanho/i.test((el.innerText || '').trim()))
-            .closest('tr')
-            .find('li.variable-item.button-variable-item.selected')
-            .first()
-            .attr('data-value');
-
-          const colorVal = $body
-            .find('td.label')
-            .filter((_, el) => /color|cor/i.test((el.innerText || '').trim()))
-            .closest('tr')
-            .find('li.variable-item.button-variable-item.selected')
-            .first()
-            .attr('data-value');
-
-          if (sizeVal) {
-            cy.get(`select[name^="attribute_"][name*="size"]`, { timeout: 15000 })
-              .first()
-              .select(sizeVal, { force: true })
-              .trigger('change', { force: true });
-          }
-
-          if (colorVal) {
-            cy.get(`select[name^="attribute_"][name*="color"]`, { timeout: 15000 })
-              .first()
-              .select(colorVal, { force: true })
-              .trigger('change', { force: true });
-          }
-        });
-      });
-
-    cy.get('input.variation_id', { timeout: 20000 }).should(($el) => {
-      const v2 = $el.val();
-      expect(v2, 'variation_id preenchido').to.not.be.oneOf(['', '0', null, undefined]);
-    });
-  }
-
-  addToCart() {
+  abrirPrimeiroProduto() {
+    // pega o primeiro produto VISÍVEL que NÃO esteja marcado como "outofstock" (quando existir)
     cy.get(
-      'button.single_add_to_cart_button, button[name="add-to-cart"], .single_add_to_cart_button',
+      '.products a.woocommerce-LoopProduct-link, .products a.woocommerce-loop-product__link, .products a[href*="/product/"], .products a[href*="/produto/"]',
       { timeout: 20000 }
     )
       .filter(':visible')
-      .should('not.have.class', 'disabled')
-      .click({ force: true });
+      .then(($links) => {
+        const links = [...$links];
+
+        const escolhido = links.find((a) => {
+          const card = a.closest('li.product, .product');
+          return card && !card.classList.contains('outofstock');
+        });
+
+        if (!escolhido) {
+          throw new Error('Não achei nenhum produto com estoque na listagem.');
+        }
+
+        cy.wrap(escolhido).click({ force: true });
+      });
+
+    // aceita /product/ e /produto/ (varia conforme o tema)
+    cy.location('pathname', { timeout: 20000 }).should('match', /\/(product|produto)\//);
   }
 
-  goToCartFromNotice() {
-    cy.contains('a', /ver carrinho|view cart/i, { timeout: 20000 })
+  selecionarVariacao(retries = 3) {
+    cy.get('body').then(($body) => {
+      if (!$body.find('form.variations_form').length) return;
+
+      const pickRandom = ($sel) => {
+        const opts = [...$sel.find('option')];
+        const values = opts
+          .filter((o) => o.value && o.value !== '' && !o.disabled)
+          .map((o) => o.value);
+
+        if (!values.length) return;
+
+        const value = values[Math.floor(Math.random() * values.length)];
+        cy.wrap($sel).select(value, { force: true }).trigger('change', { force: true });
+      };
+
+      cy.get('form.variations_form select').each(($sel) => pickRandom($sel));
+
+      // valida: variation_id preenchido + botão de compra habilitado
+      cy.get('input.variation_id', { timeout: 20000 })
+        .invoke('val')
+        .then((v) => {
+          const id = String(v || '').trim();
+          const hasId = /^\d+$/.test(id) && id !== '0';
+
+          cy.get('button.single_add_to_cart_button, button[name="add-to-cart"]', { timeout: 20000 }).then(
+            ($btn) => {
+              const disabled =
+                $btn.is(':disabled') ||
+                $btn.hasClass('disabled') ||
+                $btn.hasClass('wc-variation-is-unavailable');
+
+              if (hasId && !disabled) return;
+
+              if (retries <= 0) {
+                throw new Error('Não consegui selecionar uma variação disponível para compra.');
+              }
+
+              if ($body.find('a.reset_variations').length) {
+                cy.get('a.reset_variations').click({ force: true });
+              }
+
+              // tenta novamente com outra combinação
+              this.selecionarVariacao(retries - 1);
+            }
+          );
+        });
+    });
+  }
+
+  escolherQuantidade(qty) {
+    cy.get('input.qty, input[name="quantity"]', { timeout: 20000 })
+      .first()
+      .clear({ force: true })
+      .type(String(qty), { force: true })
+      .should('have.value', String(qty));
+  }
+
+  addCarrinho() {
+    cy.get('button.single_add_to_cart_button, button[name="add-to-cart"]', { timeout: 20000 })
+      .should(($btn) => {
+        const disabled =
+          $btn.is(':disabled') ||
+          $btn.hasClass('disabled') ||
+          $btn.hasClass('wc-variation-is-unavailable');
+
+        expect(disabled, 'botão Comprar habilitado').to.eq(false);
+      })
       .click({ force: true });
 
-    cy.location('pathname', { timeout: 20000 }).should('include', '/carrinho');
+    // garante feedback de carrinho (como foi feito em aula)
+    cy.get('.woocommerce-message, .woocommerce-notices-wrapper', { timeout: 20000 }).should('be.visible');
   }
 }
 

@@ -1,0 +1,7 @@
+{
+  "fragments": {
+    "div.widget_shopping_cart_content": "<div class='widget_shopping_cart_content'><div class='mini_cart_content'><span class='mini-cart-items'>99</span><span class='mini-cart-total'>R$ 9.999,00</span></div></div>",
+    "span.cart-contents": "<span class='cart-contents'>Carrinho: R$ 9.999,00</span>"
+  },
+  "cart_hash": "mock_cart_hash_123"
+}
