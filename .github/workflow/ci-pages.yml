@@ -1,0 +1,59 @@
+name: CI - Cypress e Relatório no GitHub Pages
+
+on:
+  push:
+    branches: ["exercicios/modulo-4"]
+  pull_request:
+    branches: ["exercicios/modulo-4"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  testes-e-publicacao:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Preparar o Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Rodar testes (Cypress)
+        run: npm test
+
+      - name: Gerar relatório HTML
+        run: npm run report:html
+
+      - name: Garantir index.html no relatório
+        run: |
+          if [ -f cypress/reports/html/report.html ]; then
+            cp cypress/reports/html/report.html cypress/reports/html/index.html
+          fi
+          if [ ! -f cypress/reports/html/index.html ]; then
+            first=$(ls cypress/reports/html/*.html 2>/dev/null | head -n 1 || true)
+            if [ -n "$first" ]; then cp "$first" cypress/reports/html/index.html; fi
+          fi
+          test -f cypress/reports/html/index.html
+
+      - name: Salvar relatório como artefato
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio
+          path: cypress/reports/html
+
+      - name: Publicar relatório no GitHub Pages
+        if: github.event_name != 'pull_request'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./cypress/reports/html
