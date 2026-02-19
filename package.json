@@ -6,7 +6,7 @@
   "scripts": {
     "cy:open": "cypress open",
     "test": "cypress run",
-    "report:html": "mochawesome-merge cypress/reports/*.json > cypress/reports/mochawesome.json && marge cypress/reports/mochawesome.json -f report -o cypress/reports/html"
+    "report:html": "mochawesome-merge cypress/reports/*.json > cypress/reports/mochawesome-merged.json && marge cypress/reports/mochawesome-merged.json -f report -o cypress/reports/html"
   },
   "author": "ernestosbarbosa",
   "license": "ISC",
