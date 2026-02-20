@@ -30,45 +30,63 @@ jobs:
       - name: Rodar testes (Cypress)
         run: npm test
 
-      - name: Gerar relatório HTML (Mochawesome)
+      - name: Preparar relatório para publicação (public/)
         run: |
-          echo "==== Listagem de cypress/reports ===="
+          mkdir -p public
+
+          echo "==== Listagem de cypress/reports (debug) ===="
           ls -la cypress/reports || true
-          echo "==== Listagem de cypress/reports/.jsons ===="
           ls -la cypress/reports/.jsons || true
 
-          shopt -s nullglob
+          # 1) Se já existir HTML pronto, usa ele
+          if [ -f cypress/reports/index.html ]; then
+            echo "Encontrou cypress/reports/index.html. Vai publicar HTML direto."
+            cp cypress/reports/index.html public/index.html
 
-          files=(cypress/reports/.jsons/*.json)
-          if [ ${#files[@]} -eq 0 ]; then
-            files=(cypress/reports/*.json)
+            # se existir pasta de assets do relatório, copia também
+            if [ -d cypress/reports/assets ]; then
+              cp -r cypress/reports/assets public/assets
+            fi
+
+          else
+            # 2) Fallback: tenta gerar HTML a partir de JSON (se existir)
+            echo "Não encontrou index.html. Tentando gerar via JSON..."
+
+            shopt -s nullglob
+            files=(cypress/reports/.jsons/*.json)
+            if [ ${#files[@]} -eq 0 ]; then
+              files=(cypress/reports/*.json)
+            fi
+
+            if [ ${#files[@]} -eq 0 ]; then
+              echo "ERRO: nenhum JSON encontrado para gerar relatório."
+              echo "Arquivos encontrados em cypress/reports:"
+              find cypress/reports -maxdepth 4 -type f -print || true
+              exit 1
+            fi
+
+            echo "JSONs encontrados:"
+            printf '%s\n' "${files[@]}"
+
+            npx mochawesome-merge "${files[@]}" > public/mochawesome-merged.json
+            npx marge public/mochawesome-merged.json -f index -o public
+            rm -f public/mochawesome-merged.json
           fi
 
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "ERRO: nenhum JSON encontrado para merge."
-            echo "Arquivos encontrados em cypress/reports:"
-            find cypress/reports -maxdepth 4 -type f -print || true
-            exit 1
-          fi
-
-          echo "JSONs encontrados:"
-          printf '%s\n' "${files[@]}"
-
-          npx mochawesome-merge "${files[@]}" > cypress/reports/mochawesome-merged.json
-          npx marge cypress/reports/mochawesome-merged.json -f index -o cypress/reports/html
-
-          test -f cypress/reports/html/index.html
+          echo "==== Conteúdo final de public/ ===="
+          ls -la public
+          test -f public/index.html
 
       - name: Salvar relatório como artefato
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: relatorio
-          path: cypress/reports/html
+          path: public
 
       - name: Publicar relatório no GitHub Pages
         if: github.event_name != 'pull_request'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./cypress/reports/html
+          publish_dir: ./public
