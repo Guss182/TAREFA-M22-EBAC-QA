@@ -30,18 +30,33 @@ jobs:
       - name: Rodar testes (Cypress)
         run: npm test
 
-      - name: Gerar relatório HTML
-        run: npm run report:html
-
-      - name: Garantir index.html no relatório
+      - name: Gerar relatório HTML (Mochawesome)
         run: |
-          if [ -f cypress/reports/html/report.html ]; then
-            cp cypress/reports/html/report.html cypress/reports/html/index.html
+          echo "==== Listagem de cypress/reports ===="
+          ls -la cypress/reports || true
+          echo "==== Listagem de cypress/reports/.jsons ===="
+          ls -la cypress/reports/.jsons || true
+
+          shopt -s nullglob
+
+          files=(cypress/reports/.jsons/*.json)
+          if [ ${#files[@]} -eq 0 ]; then
+            files=(cypress/reports/*.json)
           fi
-          if [ ! -f cypress/reports/html/index.html ]; then
-            first=$(ls cypress/reports/html/*.html 2>/dev/null | head -n 1 || true)
-            if [ -n "$first" ]; then cp "$first" cypress/reports/html/index.html; fi
+
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "ERRO: nenhum JSON encontrado para merge."
+            echo "Arquivos encontrados em cypress/reports:"
+            find cypress/reports -maxdepth 4 -type f -print || true
+            exit 1
           fi
+
+          echo "JSONs encontrados:"
+          printf '%s\n' "${files[@]}"
+
+          npx mochawesome-merge "${files[@]}" > cypress/reports/mochawesome-merged.json
+          npx marge cypress/reports/mochawesome-merged.json -f index -o cypress/reports/html
+
           test -f cypress/reports/html/index.html
 
       - name: Salvar relatório como artefato
