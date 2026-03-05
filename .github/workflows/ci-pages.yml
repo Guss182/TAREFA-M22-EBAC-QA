@@ -1,0 +1,94 @@
+name: CI - Cypress + Cypress Cloud + Relatório no GitHub Pages
+
+on:
+  push:
+    branches: ["main", "exercicios/modulo-4"]
+  pull_request:
+    branches: ["main", "exercicios/modulo-4"]
+  workflow_dispatch:
+    
+permissions:
+  contents: write
+
+jobs:
+  testes-e-publicacao:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Preparar o Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Rodar testes (Cypress + Cypress Cloud)
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+        run: npx cypress run --record --key $CYPRESS_RECORD_KEY
+
+      - name: Preparar relatório para publicação (public/)
+        run: |
+          mkdir -p public
+
+          echo "==== Listagem de cypress/reports (debug) ===="
+          ls -la cypress/reports || true
+          ls -la cypress/reports/.jsons || true
+
+          # 1) Se já existir HTML pronto, usa ele
+          if [ -f cypress/reports/index.html ]; then
+            echo "Encontrou cypress/reports/index.html. Vai publicar HTML direto."
+            cp cypress/reports/index.html public/index.html
+
+            # se existir pasta de assets do relatório, copia também
+            if [ -d cypress/reports/assets ]; then
+              cp -r cypress/reports/assets public/assets
+            fi
+
+          else
+            # 2) Fallback: tenta gerar HTML a partir de JSON (se existir)
+            echo "Não encontrou index.html. Tentando gerar via JSON..."
+
+            shopt -s nullglob
+            files=(cypress/reports/.jsons/*.json)
+            if [ ${#files[@]} -eq 0 ]; then
+              files=(cypress/reports/*.json)
+            fi
+
+            if [ ${#files[@]} -eq 0 ]; then
+              echo "ERRO: nenhum JSON encontrado para gerar relatório."
+              echo "Arquivos encontrados em cypress/reports:"
+              find cypress/reports -maxdepth 4 -type f -print || true
+              exit 1
+            fi
+
+            echo "JSONs encontrados:"
+            printf '%s\n' "${files[@]}"
+
+            npx mochawesome-merge "${files[@]}" > public/mochawesome-merged.json
+            npx marge public/mochawesome-merged.json -f index -o public
+            rm -f public/mochawesome-merged.json
+          fi
+
+          echo "==== Conteúdo final de public/ ===="
+          ls -la public
+          test -f public/index.html
+
+      - name: Salvar relatório como artefato
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio
+          path: public
+
+      - name: Publicar relatório no GitHub Pages
+        if: github.event_name != 'pull_request'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
