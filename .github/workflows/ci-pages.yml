@@ -1,4 +1,4 @@
-name: CI - Cypress e Relatório no GitHub Pages
+name: CI - Cypress + Cypress Cloud + Relatório no GitHub Pages
 
 on:
   push:
@@ -27,8 +27,10 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
-      - name: Rodar testes (Cypress)
-        run: npm test
+      - name: Rodar testes (Cypress + Cypress Cloud)
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+        run: npx cypress run --record --key $CYPRESS_RECORD_KEY --ci-build-id ${{ github.run_id }}
 
       - name: Preparar relatório para publicação (public/)
         run: |
